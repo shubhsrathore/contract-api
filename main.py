@@ -15,7 +15,7 @@ app.add_middleware(
 )
 
 
-@app.post("/process_contract")
+@app.post("/process_contract/")
 async def process_contract(file: UploadFile = File(...)):
     # Step 1: Read the file
     content = await file.read()
