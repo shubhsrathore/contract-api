@@ -16,7 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-LANGFLOW_URL = "http://localhost:7860/api/v1/run/038a0403-3cc9-454e-8a51-433318cda497?stream=false"
+LANGFLOW_URL = "http://contract-api-dnd7.onrender.com/api/v1/run/038a0403-3cc9-454e-8a51-433318cda497?stream=false"
 UPLOAD_DIR = "./uploaded_files"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
