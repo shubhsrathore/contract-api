@@ -15,8 +15,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Langflow API URL
-LANGFLOW_URL = "http://localhost:7860/predict"  # or Render/other URL
+# Langflow API URL (update with correct flow ID)
+LANGFLOW_URL = "http://localhost:7860/api/v1/run/038a0403-3cc9-454e-8a51-433318cda497?stream=false"
+
+# Optional: Add your auth/API key if Langflow requires it
+HEADERS = {
+    "Content-Type": "application/json"
+    # "Authorization": "Bearer <YOUR_TOKEN>",
+    # "x-api-key": "<YOUR_API_KEY>"
+}
 
 @app.post("/process_contract/")
 async def process_contract(file: UploadFile = File(...)):
@@ -25,14 +32,19 @@ async def process_contract(file: UploadFile = File(...)):
         content = await file.read()
         contract_text = content.decode("utf-8", errors="ignore")
 
-        # Step 2: Send text to Langflow chain
+        # Step 2: Prepare payload matching Langflow schema
         langflow_payload = {
-            "inputs": {
-                "input": contract_text
+            "output_type": "chat",
+            "input_type": "text",
+            "tweaks": {
+                "Prompt-vSTeu": {
+                    "Question": contract_text
+                }
             }
         }
 
-        response = requests.post(LANGFLOW_URL, json=langflow_payload)
+        # Step 3: Call Langflow API
+        response = requests.post(LANGFLOW_URL, headers=HEADERS, json=langflow_payload)
 
         if response.status_code != 200:
             return JSONResponse(
@@ -42,11 +54,10 @@ async def process_contract(file: UploadFile = File(...)):
 
         langflow_output = response.json()
 
-        # Step 3: Extract and optionally parse the result
+        # Step 4: Extract raw output
         raw_output = langflow_output.get("output", "")
 
-        # Step 4: (Optional) Parse output if it's structured as text
-        # You can keep this as raw text or parse like before
+        # Step 5: Parse into structured format
         parsed = []
         blocks = raw_output.strip().split("\n\n")
         for block in blocks:
@@ -70,3 +81,4 @@ async def process_contract(file: UploadFile = File(...)):
             status_code=500,
             content={"status": "error", "message": str(e)}
         )
+
