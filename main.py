@@ -8,7 +8,6 @@ import traceback
 
 app = FastAPI()
 
-# CORS config
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,10 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Langflow API URL (update with your correct flow ID)
 LANGFLOW_URL = "http://localhost:7860/api/v1/run/038a0403-3cc9-454e-8a51-433318cda497?stream=false"
-
-# Directory to save uploaded files
 UPLOAD_DIR = "./uploaded_files"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -32,7 +28,7 @@ async def process_contract(file: UploadFile = File(...)):
         saved_filename = f"{uuid.uuid4().hex}{file_ext}"
         saved_path = os.path.join(UPLOAD_DIR, saved_filename)
 
-        # Save the file to disk
+        # Save the file as binary (no decoding needed)
         with open(saved_path, "wb") as f:
             f.write(await file.read())
 
@@ -42,43 +38,28 @@ async def process_contract(file: UploadFile = File(...)):
             "input_type": "text",
             "tweaks": {
                 "Unstructured-FJRkv": {
-                    "path": saved_path,
-                    "api_key": "sSSLAoHwDvyDUygWXJsXeyxRDMNC5h",  # Ensure this API key is correct
-                    "api_url": "https://api.unstructuredapp.io/general/v0/general",
-                    "chunking_strategy": "basic",
-                    "delete_server_file_after_processing": True,
-                    "ignore_unspecified_files": False,
-                    "ignore_unsupported_extensions": True,
-                    "silent_errors": False,
-                    "unstructured_args": "{}"
+                    "path": saved_path
                 },
                 "Prompt-vSTeu": {
-                    "Question": ""  # You can add a specific question here if needed
+                    "Question": ""
                 }
             }
         }
 
-        # Send the request to Langflow
         headers = {"Content-Type": "application/json"}
         response = requests.post(LANGFLOW_URL, headers=headers, json=langflow_payload)
 
-        # Check if Langflow API responds successfully
         if response.status_code != 200:
             return JSONResponse(
                 status_code=500,
                 content={"status": "error", "message": "Langflow API error", "langflow_response": response.text}
             )
 
-        # Step 3: Parse the Langflow response (this depends on your Langflow output format)
         langflow_output = response.json()
-
-        # Return the Langflow output as a response
         return JSONResponse(content={"status": "success", "data": langflow_output})
 
     except Exception as e:
-        # Catch any errors and return the message
         traceback.print_exc()
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "message": str(e)}
-        )
+            content={"status": "error", "message": str(e)})
