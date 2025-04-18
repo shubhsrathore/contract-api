@@ -7,7 +7,7 @@ import requests
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 
-LANGFLOW_URL = "https://d03c-2402-e280-3e3f-391-71ac-e1ee-3701-e96.ngrok-free.app/api/v1/run/038a0403-3cc9-454e-8a51-433318cda497?stream=false"
+LANGFLOW_URL = " https://d03c-2402-e280-3e3f-391-71ac-e1ee-3701-e96.ngrok-free.app/api/v1/run/038a0403-3cc9-454e-8a51-433318cda497?stream=false"
 UPLOAD_DIR = "./uploaded_files"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
