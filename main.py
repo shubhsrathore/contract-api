@@ -1,20 +1,11 @@
-import os
-import uuid
+import os, uuid, traceback
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import requests
-import traceback
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 
 LANGFLOW_URL = "http://localhost:7860/api/v1/run/038a0403-3cc9-454e-8a51-433318cda497?stream=false"
 UPLOAD_DIR = "./uploaded_files"
@@ -23,22 +14,21 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @app.post("/process_contract/")
 async def process_contract(file: UploadFile = File(...)):
     try:
-        # Step 1: Save uploaded file to disk so Langflow can access it
-        file_ext = os.path.splitext(file.filename)[-1]
-        saved_filename = f"{uuid.uuid4().hex}{file_ext}"
-        saved_path = os.path.join(UPLOAD_DIR, saved_filename)
+        # save to disk
+        ext = os.path.splitext(file.filename)[1]
+        saved_name = f"{uuid.uuid4().hex}{ext}"
+        saved_path = os.path.abspath(os.path.join(UPLOAD_DIR, saved_name))
+        with open(saved_path, "wb") as out:
+            out.write(await file.read())
 
-        # Save the file as binary (no decoding needed)
-        with open(saved_path, "wb") as f:
-            f.write(await file.read())
-
-        # Step 2: Prepare Langflow payload with the saved file path
+        # prepare payload — make sure "Unstructured-XXX" matches your node ID!
         langflow_payload = {
             "output_type": "chat",
             "input_type": "text",
             "tweaks": {
-                "Unstructured-FJRkv": {
-                    "path": saved_path
+                "Unstructured-FJRkv": {   # ←– REPLACE with your actual Node ID
+                    "path": saved_path,
+                    # any other fields your UnstructuredIO node needs…
                 },
                 "Prompt-vSTeu": {
                     "Question": ""
@@ -49,17 +39,25 @@ async def process_contract(file: UploadFile = File(...)):
         headers = {"Content-Type": "application/json"}
         response = requests.post(LANGFLOW_URL, headers=headers, json=langflow_payload)
 
-        if response.status_code != 200:
+        # debug logging
+        print("↘ Langflow status:", response.status_code)
+        print("↘ Langflow raw response:", repr(response.text))
+
+        # handle non‑200
+        if response.status_code != 200 or not response.text:
             return JSONResponse(
                 status_code=500,
-                content={"status": "error", "message": "Langflow API error", "langflow_response": response.text}
+                content={"status": "error", "message": "Langflow error", "details": response.text}
             )
 
-        langflow_output = response.json()
-        return JSONResponse(content={"status": "success", "data": langflow_output})
+        # parse JSON safely
+        try:
+            data = response.json()
+        except ValueError:
+            return JSONResponse(status_code=500, content={"status":"error","message":"Invalid JSON from Langflow","raw":response.text})
+
+        return JSONResponse(content={"status": "success", "data": data})
 
     except Exception as e:
         traceback.print_exc()
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
